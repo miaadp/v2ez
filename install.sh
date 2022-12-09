@@ -34,7 +34,6 @@ ssl_update_file="/usr/bin/ssl_update.sh"
 nginx_version="1.20.1"
 openssl_version="1.1.1k"
 jemalloc_version="5.2.1"
-old_config_status="off"
 
 [[ -f "/etc/v2ray/vmess_qr.json" ]] && mv /etc/v2ray/vmess_qr.json $v2ray_qr_config_file
 
@@ -58,10 +57,8 @@ check_system() {
   fi
 
   apt -y install dbus
-  systemctl stop firewalld
-  systemctl disable firewalld
-  systemctl stop ufw
-  systemctl disable ufw
+  systemctl stop firewalld && systemctl disable firewalld
+  systemctl stop ufw && systemctl disable ufw
 }
 
 is_root() {
@@ -76,7 +73,6 @@ is_root() {
 judge() {
   if [[ 0 -eq $? ]]; then
     echo -e "${OK} ${GreenBG} $1 done ${Font}"
-    sleep 1
   else
     echo -e "${Error} ${RedBG} $1 failed ${Font}"
     exit 1
@@ -86,15 +82,10 @@ judge() {
 chrony_install() {
   apt -y install chrony
   judge "Install chrony time synchronization service"
-
   timedatectl set-ntp true
-
   systemctl enable chrony && systemctl restart chrony
-
   judge "chronyd start"
-
   timedatectl set-timezone Asia/Shanghai
-
   echo -e "${OK} ${GreenBG} wait for time sync ${Font}"
   chronyc sourcestats -v
   chronyc tracking -v
@@ -104,15 +95,11 @@ chrony_install() {
 
 dependency_install() {
   apt -y install wget git lsof -y cron
-
   touch /var/spool/cron/crontabs/root && chmod 600 /var/spool/cron/crontabs/root
   systemctl start cron && systemctl enable cron
   judge "crontab autostart configuration"
-
   apt -y install bc unzip qrencode curl build-essential libpcre3 libpcre3-dev zlib1g-dev dbus haveged
-
   systemctl start haveged && systemctl enable haveged
-
   mkdir -p /usr/local/bin >/dev/null 2>&1
 }
 
@@ -124,24 +111,16 @@ basic_optimization() {
 }
 
 port_alterid_set() {
-  if [[ "on" != "$old_config_status" ]]; then
-    port="443"
-    alterID="0"
-  fi
+  port="443"
+  alterID="0"
 }
 
 modify_path() {
-  if [[ "on" == "$old_config_status" ]]; then
-    camouflage="$(grep '\"path\"' $v2ray_qr_config_file | awk -F '"' '{print $4}')"
-  fi
   sed -i "/\"path\"/c \\\t  \"path\":\"${camouflage}\"" ${v2ray_conf}
   judge "V2ray camouflage path modification"
 }
 
 modify_inbound_port() {
-  if [[ "on" == "$old_config_status" ]]; then
-    port="$(info_extraction '\"port\"')"
-  fi
   PORT=$((RANDOM + 10000))
   sed -i "/\"port\"/c  \    \"port\":${PORT}," ${v2ray_conf}
   judge "V2ray inbound_port modification"
@@ -149,9 +128,6 @@ modify_inbound_port() {
 
 modify_UUID() {
   [ -z "$UUID" ] && UUID=$(cat /proc/sys/kernel/random/uuid)
-  if [[ "on" == "$old_config_status" ]]; then
-    UUID="$(info_extraction '\"id\"')"
-  fi
   sed -i "/\"id\"/c \\\t  \"id\":\"${UUID}\"," ${v2ray_conf}
   judge "V2ray UUID modification"
   [ -f ${v2ray_qr_config_file} ] && sed -i "/\"id\"/c \\  \"id\": \"${UUID}\"," ${v2ray_qr_config_file}
@@ -159,9 +135,6 @@ modify_UUID() {
 }
 
 modify_nginx_port() {
-  if [[ "on" == "$old_config_status" ]]; then
-    port="$(info_extraction '\"port\"')"
-  fi
   sed -i "/ssl http2;$/c \\\tlisten ${port} ssl http2;" ${nginx_conf}
   sed -i "3c \\\tlisten [::]:${port} http2;" ${nginx_conf}
   judge "V2ray port modification"
@@ -177,7 +150,6 @@ modify_nginx_other() {
 }
 
 web_camouflage() {
-
   rm -rf /home/wwwroot
   mkdir -p /home/wwwroot
   cd /home/wwwroot || exit
@@ -221,7 +193,6 @@ nginx_exist_check() {
 }
 
 nginx_install() {
-
   wget -nc --no-check-certificate http://nginx.org/download/nginx-${nginx_version}.tar.gz -P ${nginx_openssl_src}
   judge "Nginx download"
   wget -nc --no-check-certificate https://www.openssl.org/source/openssl-${openssl_version}.tar.gz -P ${nginx_openssl_src}
@@ -242,9 +213,7 @@ nginx_install() {
 
   [[ -d "$nginx_dir" ]] && rm -rf ${nginx_dir}
   echo -e "${OK} ${GreenBG} is about to start compiling and installing jemalloc ${Font}"
-  sleep 2
-
-  cd jemalloc -${jemalloc_version} || exit
+  cd jemalloc-${jemalloc_version} || exit
   ./configure
   judge "compile check"
   make -j "${THREAD}" && make install
@@ -253,8 +222,6 @@ nginx_install() {
   ldconfig
 
   echo -e "${OK} ${GreenBG} is about to start compiling and installing Nginx, the process will take a while, please wait patiently ${Font}"
-  sleep 4
-
   cd ../nginx-${nginx_version} || exit
 
   ./configure --prefix="${nginx_dir}" \
@@ -298,24 +265,6 @@ ssl_install() {
 
 domain_check() {
   read -rp "Please enter your domain name information (eg:www.wulabing.com):" domain
-  domain_ip=$(curl -sm8 https://ipget.net/?ip="${domain}")
-  echo -e "${OK} ${GreenBG} is getting public IP information, please wait patiently ${Font}"
-  wgcfv4_status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-  wgcfv6_status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-  if [[ ${wgcfv4_status} =~ "on"|"plus" ]] || [[ ${wgcfv6_status} =~ "on"|"plus" ]]; then
-
-    wg-quick down wgcf >/dev/null 2>&1
-    echo -e "${OK} ${GreenBG} closed wgcf-warp ${Font}"
-  fi
-  local_ipv4=$(curl -s4m8 https://ip.gs)
-  local_ipv6=$(curl -s6m8 https://ip.gs)
-  if [[ -z ${local_ipv4} && -n ${local_ipv6} ]]; then
-    echo -e nameserver 2a01:4f8:c2c:123f::1 >/etc/resolv.conf
-    echo -e "${OK} ${GreenBG} recognized as IPv6 Only VPS, automatically add DNS64 server ${Font}"
-  fi
-  echo -e "The IP of domain name DNS resolution: ${domain_ip}"
-  echo -e "Local IPv4: ${local_ipv4}"
-  echo -e "Local IPv6: ${local_ipv6}"
 }
 
 port_exist_check() {
@@ -325,7 +274,6 @@ port_exist_check() {
     echo -e "${Error} ${RedBG} detected that $1 port is occupied, the following is $1 port occupation information ${Font}"
     lsof -i:"$1"
     echo -e "${OK} ${GreenBG} will try to automatically kill the occupied process ${Font} after 5s"
-    sleep 1
     lsof -i:"$1" | awk '{print $2}' | grep -v "PID" | xargs kill -9
     echo -e "${OK} ${GreenBG} kill completed ${Font}"
   fi
@@ -335,11 +283,9 @@ acme() {
 
   if "$HOME"/.acme.sh/acme.sh --issue --insecure -d "${domain}" --standalone -k ec-256 --force; then
     echo -e "${OK} ${GreenBG} SSL certificate successfully generated ${Font}"
-    sleep 2
     mkdir /data
     if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /data/v2ray.crt --keypath /data/v2ray.key --ecc --force; then
       echo -e "${OK} ${GreenBG} certificate successfully configured ${Font}"
-      sleep 2
       if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
         wg-quick up wgcf >/dev/null 2>&1
         echo -e "${OK} ${GreenBG} started wgcf-warp ${Font}"
@@ -425,33 +371,26 @@ EOF
   modify_nginx_port
   modify_nginx_other
   judge "Nginx configuration modification"
-
 }
 
 start_process_systemd() {
   systemctl daemon-reload
   chown -R root.root /var/log/v2ray/
-  systemctl restart nginx
-  judge "Nginx start"
-  systemctl restart v2ray
-  judge "V2ray start"
+  systemctl restart nginx && systemctl restart v2ray
+  judge "Nginx and V2ray start"
 }
 
 enable_process_systemd() {
-  systemctl enable v2ray
-  judge "Set v2ray to start automatically"
-  systemctl enable nginx
-  judge "Set Nginx to start automatically at boot"
+  systemctl enable v2ray && systemctl enable nginx
+  judge "Set v2ray and Nginx to start automatically at boot"
 }
 
 acme_cron_update() {
   wget -N -P /usr/bin --no-check-certificate "https://raw.githubusercontent.com/wulabing/V2Ray_ws-tls_bash_onekey/dev/ssl_update.sh"
   if [[ $(crontab -l | grep -c "ssl_update.sh") -lt 1 ]]; then
     if [[ "${ID}" == "centos" ]]; then
-
       sed -i "/acme.sh/c 0 3 * * 0 bash ${ssl_update_file}" /var/spool/cron/root
     else
-
       sed -i "/acme.sh/c 0 3 * * 0 bash ${ssl_update_file}" /var/spool/cron/crontabs/root
     fi
   fi
@@ -520,10 +459,8 @@ ssl_judge_and_install() {
       echo -e "${OK} ${GreenBG} removed ${Font}"
       ;;
     *) ;;
-
     esac
   fi
-
   if [[ -f "/data/v2ray.key" || -f "/data/v2ray.crt" ]]; then
     echo "Certificate file already exists"
   elif [[ -f "$HOME/.acme.sh/${domain}_ecc/${domain}.key" && -f "$HOME/.acme.sh/${domain}_ecc/${domain}. cer" ]]; then
