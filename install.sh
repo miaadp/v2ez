@@ -51,7 +51,7 @@ VERSION=$(echo "${VERSION}" | awk -F "[()]" '{print $2}')
 check_system() {
   if [[ "${ID}" == "debian" && ${VERSION_ID} -ge 8 ]]; then
     echo -e "${OK} ${GreenBG} The current system is Debian ${VERSION_ID} ${VERSION} ${Font}"
-    apt update
+    yes | apt update
   else
     echo -e "${Error} ${RedBG} The current system is ${ID} ${VERSION_ID} is not in the list of supported systems, the installation is interrupted ${Font}"
     exit 1
@@ -67,7 +67,6 @@ check_system() {
 is_root() {
   if [ 0 == $UID ]; then
     echo -e "${OK} ${GreenBG} The current user is the root user, enter the installation process ${Font}"
-    sleep 3
   else
     echo -e "${Error} ${RedBG} The current user is not the root user, please switch to the root user and execute the script again ${Font}"
     exit 1
@@ -97,13 +96,10 @@ chrony_install() {
   timedatectl set-timezone Asia/Shanghai
 
   echo -e "${OK} ${GreenBG} wait for time sync ${Font}"
-  sleep 10
-
   chronyc sourcestats -v
   chronyc tracking -v
   date
   echo -e "${GreenBG} continue to install ${Font}"
-  sleep 2
 }
 
 dependency_install() {
@@ -236,10 +232,8 @@ v2ray_install() {
 nginx_exist_check() {
   if [[ -f "/etc/nginx/sbin/nginx" ]]; then
     echo -e "${OK} ${GreenBG} Nginx already exists, skip compiling and installing ${Font}"
-    sleep 2
   elif [[ -d "/usr/local/nginx/" ]]; then
     echo -e "${OK} ${GreenBG} detected Nginx installed by other packages, continuing to install will cause conflicts, please install ${Font} after processing"
-    exit 1
   else
     nginx_install
   fi
@@ -341,21 +335,18 @@ domain_check() {
   echo -e "The IP of domain name DNS resolution: ${domain_ip}"
   echo -e "Local IPv4: ${local_ipv4}"
   echo -e "Local IPv6: ${local_ipv6}"
-  sleep 2
 }
 
 port_exist_check() {
   if [[ 0 -eq $(lsof -i:"$1" | grep -i -c "listen") ]]; then
     echo -e "${OK} ${GreenBG} $1 port is not used ${Font}"
-    sleep 1
   else
     echo -e "${Error} ${RedBG} detected that $1 port is occupied, the following is $1 port occupation information ${Font}"
     lsof -i:"$1"
     echo -e "${OK} ${GreenBG} will try to automatically kill the occupied process ${Font} after 5s"
-    sleep 5
+    sleep 1
     lsof -i:"$1" | awk '{print $2}' | grep -v "PID" | xargs kill -9
     echo -e "${OK} ${GreenBG} kill completed ${Font}"
-    sleep 1
   fi
 }
 acme() {
