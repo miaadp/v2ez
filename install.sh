@@ -51,7 +51,7 @@ VERSION=$(echo "${VERSION}" | awk -F "[()]" '{print $2}')
 check_system() {
   if [[ "${ID}" == "debian" && ${VERSION_ID} -ge 8 ]]; then
     echo -e "${OK} ${GreenBG} The current system is Debian ${VERSION_ID} ${VERSION} ${Font}"
-    yes | apt update
+    apt -y update
   else
     echo -e "${Error} ${RedBG} The current system is ${ID} ${VERSION_ID} is not in the list of supported systems, the installation is interrupted ${Font}"
     exit 1
@@ -234,6 +234,7 @@ nginx_exist_check() {
     echo -e "${OK} ${GreenBG} Nginx already exists, skip compiling and installing ${Font}"
   elif [[ -d "/usr/local/nginx/" ]]; then
     echo -e "${OK} ${GreenBG} detected Nginx installed by other packages, continuing to install will cause conflicts, please install ${Font} after processing"
+    exit 1
   else
     nginx_install
   fi
