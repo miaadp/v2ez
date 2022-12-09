@@ -103,33 +103,13 @@ chrony_install() {
 }
 
 dependency_install() {
-  apt -y install wget git lsof -y
-
-  apt -y install cron
-  judge "install crontab"
+  apt -y install wget git lsof -y cron
 
   touch /var/spool/cron/crontabs/root && chmod 600 /var/spool/cron/crontabs/root
   systemctl start cron && systemctl enable cron
   judge "crontab autostart configuration"
 
-  apt -y install bc
-  judge "install bc"
-
-  apt -y install unzip
-  judge "install unzip"
-
-  apt -y install qrencode
-  judge "Install qrencode"
-
-  apt -y install curl
-  judge "install curl"
-
-  apt -y install build-essential
-  judge "Compile Toolkit Install"
-
-  apt -y install libpcre3 libpcre3-dev zlib1g-dev dbus
-
-  apt -y install haveged
+  apt -y install bc unzip qrencode curl build-essential libpcre3 libpcre3-dev zlib1g-dev dbus haveged
 
   systemctl start haveged && systemctl enable haveged
 
