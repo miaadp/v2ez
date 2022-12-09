@@ -35,7 +35,6 @@ nginx_version="1.20.1"
 openssl_version="1.1.1k"
 jemalloc_version="5.2.1"
 
-[[ -f "/etc/v2ray/vmess_qr.json" ]] && mv /etc/v2ray/vmess_qr.json $v2ray_qr_config_file
 
 random_num=$((RANDOM % 12 + 4))
 
@@ -122,29 +121,20 @@ modify_path() {
 
 modify_inbound_port() {
   PORT=$((RANDOM + 10000))
-  sed -i "/\"port\"/c  \    \"port\":${PORT}," ${v2ray_conf}
+  sed -i "/\"port\" /c  \    \"port\":${PORT}," ${v2ray_conf}
   judge "V2ray inbound_port modification"
-}
-
-modify_UUID() {
-  [ -z "$UUID" ] && UUID=$(cat /proc/sys/kernel/random/uuid)
-  sed -i "/\"id\"/c \\\t  \"id\":\"${UUID}\"," ${v2ray_conf}
-  judge "V2ray UUID modification"
-  [ -f ${v2ray_qr_config_file} ] && sed -i "/\"id\"/c \\  \"id\": \"${UUID}\"," ${v2ray_qr_config_file}
-  echo -e "${OK} ${GreenBG} UUID:${UUID} ${Font}"
 }
 
 modify_nginx_port() {
   sed -i "/ssl http2;$/c \\\tlisten ${port} ssl http2;" ${nginx_conf}
   sed -i "3c \\\tlisten [::]:${port} http2;" ${nginx_conf}
   judge "V2ray port modification"
-  [ -f ${v2ray_qr_config_file} ] && sed -i "/\"port\"/c \\  \"port\": \"${port}\"," ${v2ray_qr_config_file}
   echo -e "${OK} ${GreenBG} port number: ${port} ${Font}"
 }
 
 modify_nginx_other() {
   sed -i "/server_name/c \\\tserver_name ${domain};" ${nginx_conf}
-  sed -i "/location/c \\\tlocation ${camouflage}" ${nginx_conf}
+  sed -i "/location \//c \\\tlocation ${camouflage}" ${nginx_conf}
   sed -i "/proxy_pass/c \\\tproxy_pass http://127.0.0.1:${PORT};" ${nginx_conf}
   sed -i "/return/c \\\treturn 301 https://${domain}\$request_uri;" ${nginx_conf}
 }
@@ -264,6 +254,7 @@ ssl_install() {
 }
 
 domain_check() {
+  # domain='existSub.v314n.xyz'
   read -rp "Please enter your domain name information (eg:www.wulabing.com):" domain
 }
 
@@ -307,7 +298,6 @@ v2ray_conf_add_tls() {
   wget --no-check-certificate https://raw.githubusercontent.com/miaadp/v2ez/main/config.json -O config.json
   modify_path
   modify_inbound_port
-  modify_UUID
 }
 
 old_config_exist_check() {
@@ -397,54 +387,8 @@ acme_cron_update() {
   judge "cron scheduled task update"
 }
 
-vmess_qr_config_tls_ws() {
-  cat >$v2ray_qr_config_file <<-EOF
-{
-  "v": "2",
-  "ps": "wulabing_${domain}",
-  "add": "${domain}",
-  "port": "${port}",
-  "id": "${UUID}",
-  "aid": "${alterID}",
-  "net": "ws",
-  "type": "none",
-  "host": "${domain}",
-  "path": "${camouflage}",
-  "tls": "tls"
-}
-EOF
-}
-
-vmess_link_image_choice() {
-  vmess_link="vmess://$(base64 -w 0 $v2ray_qr_config_file)"
-  {
-    echo -e "$Red QR code: $Font"
-    echo -n "${vmess_link}" | qrencode -o - -t utf8
-    echo -e "${Red} URL import link: ${vmess_link} ${Font}"
-  } >>"${v2ray_info_file}"
-}
-
-info_extraction() {
-  grep "$1" $v2ray_qr_config_file | awk -F '"' '{print $4}'
-}
-
-basic_information() {
-  {
-    echo -e "${OK} ${GreenBG} V2ray+ws+tls installed successfully"
-    echo -e "${Red} V2ray configuration information ${Font}"
-    echo -e "${Red} address (address): ${Font} $(info_extraction '\"add\"') "
-    echo -e "${Red} port (port): ${Font} $(info_extraction '\"port\"') "
-    echo -e "${Red} user id (UUID): ${Font} $(info_extraction '\"id\"')"
-    echo -e "${Red} extra id (alterId): ${Font} $(info_extraction '\"aid\"')"
-    echo -e "${Red} encryption method (security): ${Font} adaptive "
-    echo -e "${Red} transport protocol (network): ${Font} $(info_extraction '\"net\"') "
-    echo -e "${Red} masquerade type (type): ${Font} none "
-    echo -e "${Red} path (don't leave /): ${Font} $(info_extraction '\"path\"') "
-    echo -e "${Red} LTS: ${Font} tls "
-  } >"${v2ray_info_file}"
-}
-
 show_information() {
+  echo -e "${OK} ${GreenBG} V2ray+ws+tls installed successfully"
   cat "${v2ray_info_file}"
 }
 
@@ -525,9 +469,6 @@ nginx_conf_add
 web_camouflage
 ssl_judge_and_install
 nginx_systemd
-vmess_qr_config_tls_ws
-basic_information
-vmess_link_image_choice
 tls_type
 start_process_systemd
 enable_process_systemd
