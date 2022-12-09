@@ -111,7 +111,6 @@ basic_optimization() {
 
 port_alterid_set() {
   port="443"
-  alterID="0"
 }
 
 modify_path() {
