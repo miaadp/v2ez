@@ -27,17 +27,12 @@
 	},
 	"inbounds": [
 		{
-			"port": 10086,
+			"port" : 10086,
 			"listen": "127.0.0.1",
 			"tag": "vmess-in",
 			"protocol": "vmess",
 			"settings": {
-				"clients": [
-					{
-						"id": "3f3effce-2640-4f29-b95b-a2106df6d96d",
-						"alterId": 4
-					}
-				]
+				"clients": []
 			},
 			"streamSettings": {
 				"network": "ws",
