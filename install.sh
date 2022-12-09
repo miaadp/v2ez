@@ -57,7 +57,7 @@ check_system() {
     exit 1
   fi
 
-  apt install dbus
+  apt -y install dbus
   systemctl stop firewalld
   systemctl disable firewalld
   systemctl stop ufw
@@ -103,7 +103,7 @@ chrony_install() {
 }
 
 dependency_install() {
-  apt install wget git lsof -y
+  apt -y install wget git lsof -y
 
   apt -y install cron
   judge "install crontab"
@@ -309,7 +309,7 @@ nginx_install() {
 }
 
 ssl_install() {
-  apt install socat netcat -y
+  apt -y install socat netcat -y
   judge "Install SSL certificate generation script dependencies"
 
   curl https://get.acme.sh | sh
