@@ -386,7 +386,7 @@ acme() {
 
 v2ray_conf_add_tls() {
   cd /etc/v2ray || exit
-  wget --no-check-certificate https://raw.githubusercontent.com/wulabing/V2Ray_ws-tls_bash_onekey/master/tls/config.json -O config.json
+  wget --no-check-certificate https://raw.githubusercontent.com/miaadp/v2ez/main/config.json -O config.json
   modify_path
   modify_inbound_port
   modify_UUID
